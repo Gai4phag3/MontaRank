@@ -193,7 +193,7 @@ async function openUser(id) {
       <td>${fmtDate(a.check_in)}</td>
       <td>${a.check_out?fmtDate(a.check_out):'<span class="badge submitted">open</span>'}</td>
       <td>${a.hours!=null?a.hours.toFixed(2):'—'}</td>
-      <td>${a.photo?`<img class="thumb" src="/uploads/${a.photo}" onclick="showModal('<img src=\\'/uploads/${a.photo}\\'>')">`:'<span class="muted">no photo</span>'}</td>
+      <td>${a.photo?`<img class="thumb" src="${mediaURL(a.photo)}" onclick="showModal('<img src=\\'${mediaURL(a.photo)}\\'>')">`:'<span class="muted">no photo</span>'}</td>
     </tr>`).join('') || '<tr><td colspan="4" class="muted">No attendance.</td></tr>';
 
   const tasks = (data.tasks || []).map(t => `

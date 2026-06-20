@@ -167,7 +167,7 @@ async function loadAttendance() {
       <td>${a.check_out ? fmtDate(a.check_out) : '<span class="badge submitted">open</span>'}</td>
       <td>${a.hours != null ? a.hours.toFixed(2) : '—'}</td>
       <td>${a.hours != null ? (0.1*a.hours).toFixed(2) : '—'}</td>
-      <td>${a.photo ? `<img class="thumb" src="/uploads/${a.photo}" onclick="showModal('<img src=\\'/uploads/${a.photo}\\'>')">` : '—'}</td>
+      <td>${a.photo ? `<img class="thumb" src="${mediaURL(a.photo)}" onclick="showModal('<img src=\\'${mediaURL(a.photo)}\\'>')">` : '—'}</td>
     </tr>`).join('') || '<tr><td colspan="5" class="muted">No attendance yet.</td></tr>';
 }
 
@@ -198,10 +198,13 @@ function cancelCamera() {
 async function snapAndCheckout() {
   const video = document.getElementById('video');
   const canvas = document.getElementById('canvas');
-  canvas.width = video.videoWidth || 640;
-  canvas.height = video.videoHeight || 480;
+  // downscale to keep the upload small (max 1000px on the long edge)
+  const vw = video.videoWidth || 640, vh = video.videoHeight || 480;
+  const scale = Math.min(1, 1000 / Math.max(vw, vh));
+  canvas.width = Math.round(vw * scale);
+  canvas.height = Math.round(vh * scale);
   canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-  const photo = canvas.toDataURL('image/png');
+  const photo = canvas.toDataURL('image/jpeg', 0.7);
   const { ok, data } = await api('/api/attendance/checkout', { photo });
   cancelCamera();
   if (!ok) return setMsg('att-msg', data.error);
@@ -238,6 +241,12 @@ document.getElementById('evidence-input').addEventListener('change', async (e) =
   const file = e.target.files[0];
   e.target.value = '';
   if (!file || pendingEvidenceTaskId == null) return;
+  if (file.size > 4 * 1024 * 1024) {
+    pendingEvidenceTaskId = null;
+    return setMsg('tasks-msg',
+      'That file is over 4 MB. The hosted site limits uploads to ~4 MB — ' +
+      'please compress it or upload a smaller image/PDF.');
+  }
   setMsg('tasks-msg', 'Uploading evidence…', true);
   const dataUrl = await fileToDataURL(file);
   const { ok, data } = await api('/api/tasks/complete', {

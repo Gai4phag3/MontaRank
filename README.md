@@ -6,9 +6,13 @@ full administrator panel.
 
 Built with **only the Python standard library** — no installs, no Node, no build step.
 
+> **Want it online for the whole team (free, HTTPS, camera works on phones)?**
+> See **[DEPLOY.md](DEPLOY.md)** to host it on Vercel + Neon Postgres + Vercel Blob.
+> The instructions below are for running it locally on one machine.
+
 ---
 
-## Running it
+## Running it locally
 
 1. Make sure Python 3 is installed (you have 3.14). Check with `py --version`.
 2. Double-click **`Start MontaRanker.bat`** — it launches the server and opens

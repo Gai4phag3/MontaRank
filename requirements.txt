@@ -1,0 +1,2 @@
+psycopg2-binary>=2.9
+vercel_blob>=0.3.0

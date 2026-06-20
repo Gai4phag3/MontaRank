@@ -45,9 +45,16 @@ function closeModal() {
   if (m) m.remove();
 }
 
+// Local server stores a relative path ("attendance/x.png" -> /uploads/...);
+// Vercel stores a full https Blob URL. Normalise either to a usable URL.
+function mediaURL(v) {
+  if (!v) return '';
+  return /^https?:\/\//.test(v) ? v : '/uploads/' + v;
+}
+
 function mediaPreview(url, mime) {
   if (!url) return '<p class="muted">No file.</p>';
-  const full = '/uploads/' + url;
+  const full = mediaURL(url);
   if ((mime || '').startsWith('image/') || /\.(png|jpg|jpeg|gif|webp)$/i.test(url))
     return `<img src="${full}">`;
   if ((mime || '').startsWith('video/') || /\.(mp4|webm|mov)$/i.test(url))
