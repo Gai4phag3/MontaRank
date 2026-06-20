@@ -377,3 +377,35 @@ video, canvas {
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--panel3); border-radius: 8px; border: 2px solid var(--bg); }
 ::-webkit-scrollbar-thumb:hover { background: var(--gold-dim); }
+
+/* phones / small screens */
+@media (max-width: 720px) {
+  .container { padding: 16px 12px 48px; }
+  .topbar { padding: 12px 14px; }
+  .brand { font-size: 16px; }
+  .auth-title { font-size: 24px; }
+  .tabs { gap: 2px; }
+  .tab { padding: 9px 10px; font-size: 13px; }
+
+  /* keep the long member name from pushing the logout button off-screen */
+  #whoami { display: inline-block; max-width: 40vw; overflow: hidden;
+            text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+
+  /* wide tables scroll sideways inside their card instead of breaking the page */
+  .card { padding: 16px; overflow-x: auto; }
+  .card h2 { font-size: 17px; }
+  /* buttons that float in a heading drop below it instead of overlapping the title */
+  .card h2 button { float: none !important; display: block; margin-top: 10px; }
+  th, td { padding: 8px 9px; }
+  table { min-width: 460px; }
+
+  .grid { grid-template-columns: 1fr 1fr; }
+  .score-big { font-size: 26px; }
+  .modal { padding: 18px; }
+  video, canvas { max-width: 100%; }
+}
+
+@media (max-width: 380px) {
+  .grid { grid-template-columns: 1fr; }
+  .tab { padding: 8px; font-size: 12px; }
+}
