@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin — MontaRanker</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">Monta<span>Ranker</span> · Admin</div>
+  <div class="right">
+    <span class="muted">Administrator</span>
+    <button class="secondary small" onclick="logout()">Log Out</button>
+  </div>
+</div>
+
+<div class="container">
+  <div class="tabs">
+    <div class="tab active" data-view="home">Home</div>
+    <div class="tab" data-view="verify">Verifications</div>
+    <div class="tab" data-view="users">Members</div>
+    <div class="tab" data-view="scoreboard">Scoreboard</div>
+  </div>
+
+  <!-- HOME -->
+  <div id="view-home">
+    <div class="card">
+      <h2>Overview</h2>
+      <div class="grid" id="stats"></div>
+    </div>
+    <div class="row">
+      <div class="card">
+        <h3>🏆 Hardest workers (verified task difficulty)</h3>
+        <table id="hardest"><tbody></tbody></table>
+      </div>
+      <div class="card">
+        <h3>📊 Top of the leaderboard</h3>
+        <table id="leaders"><tbody></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- VERIFICATIONS -->
+  <div id="view-verify" class="hidden">
+    <div class="card">
+      <h2>Pending Task Verifications</h2>
+      <div id="verify-msg"></div>
+      <div class="btnrow">
+        <button class="green" onclick="verifyAll()">✓ Approve All</button>
+        <button class="secondary" onclick="loadVerify()">Refresh</button>
+      </div>
+      <table id="pending" style="margin-top:14px"><thead><tr>
+        <th>Task</th><th>Member</th><th>Difficulty</th><th>Deadline</th>
+        <th>Submitted</th><th>Evidence</th><th>Returns</th><th>Actions</th>
+      </tr></thead><tbody></tbody></table>
+      <p class="muted" style="margin-top:8px">Note: a task sent back twice earns
+        <b>no difficulty points</b> when finally verified.</p>
+    </div>
+  </div>
+
+  <!-- USERS -->
+  <div id="view-users" class="hidden">
+    <div class="card">
+      <h2>Members</h2>
+      <table id="users"><thead><tr>
+        <th>Name</th><th>ID</th><th>Grade</th><th>Position</th>
+        <th>Total</th><th>Strikes</th><th></th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <!-- SCOREBOARD -->
+  <div id="view-scoreboard" class="hidden">
+    <div class="card">
+      <h2>Scoreboard</h2>
+      <table id="scoreboard"><thead><tr>
+        <th>#</th><th>Name</th><th>Attendance</th><th>Tasks</th>
+        <th>Late Penalty</th><th>Total</th><th>Strikes</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+
+<script src="/common.js"></script>
+<script>
+function setMsg(id, text, ok=false) {
+  document.getElementById(id).innerHTML =
+    text ? `<div class="msg ${ok?'ok':'error'}">${text}</div>` : '';
+}
+
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  ['home','verify','users','scoreboard'].forEach(v =>
+    document.getElementById('view-' + v).classList.add('hidden'));
+  document.getElementById('view-' + t.dataset.view).classList.remove('hidden');
+  if (t.dataset.view === 'home') loadHome();
+  if (t.dataset.view === 'verify') loadVerify();
+  if (t.dataset.view === 'users') loadUsers();
+  if (t.dataset.view === 'scoreboard') loadScoreboard();
+});
+
+(async () => {
+  const { data } = await api('/api/me');
+  if (!data.user || data.user.role !== 'admin') { location.href = '/'; return; }
+  loadHome();
+})();
+
+// ---- home ----
+async function loadHome() {
+  const { data } = await api('/api/admin/home');
+  if (!data.stats) return;
+  const s = data.stats;
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="n">${s.total_users}</div><div class="l">Members</div></div>
+    <div class="stat"><div class="n">${s.active}</div><div class="l">Active</div></div>
+    <div class="stat"><div class="n">${s.checked_in_now}</div><div class="l">Checked in now</div></div>
+    <div class="stat"><div class="n">${s.pending_tasks}</div><div class="l">Tasks to verify</div></div>
+    <div class="stat"><div class="n">${s.total_strikes}</div><div class="l">Total strikes</div></div>`;
+  document.querySelector('#hardest tbody').innerHTML =
+    (data.hardest_workers || []).map((h,i) =>
+      `<tr><td>${i+1}</td><td>${esc(h.full_name)}</td><td><b>${h.difficulty}</b> diff pts</td></tr>`
+    ).join('') || '<tr><td class="muted">No data.</td></tr>';
+  document.querySelector('#leaders tbody').innerHTML =
+    (data.leaders || []).map((h,i) =>
+      `<tr><td>${i+1}</td><td class="${strikeClass(h.strikes)}">${esc(h.full_name)}</td><td><b>${h.total.toFixed(2)}</b></td></tr>`
+    ).join('') || '<tr><td class="muted">No data.</td></tr>';
+}
+
+// ---- verifications ----
+async function loadVerify() {
+  const { data } = await api('/api/admin/pending');
+  const tb = document.querySelector('#pending tbody');
+  tb.innerHTML = (data.tasks || []).map(t => `
+    <tr>
+      <td>${esc(t.name)}</td>
+      <td>${esc(t.assignee_name)}</td>
+      <td>${t.difficulty}</td>
+      <td>${fmtDate(t.deadline)}</td>
+      <td>${fmtDate(t.submitted_at)}</td>
+      <td>${t.evidence?`<span class="evidence-link" onclick='viewEvidence(${JSON.stringify(t.evidence)},${JSON.stringify(t.evidence_type||"")})'>view</span>`:'—'}</td>
+      <td>${t.return_count}${t.return_count>=2?' <span class="muted">(no diff pts)</span>':''}</td>
+      <td>
+        <button class="small green" onclick="verifyTask(${t.id})">Approve</button>
+        <button class="small secondary" onclick="returnTask(${t.id})">Send back</button>
+      </td>
+    </tr>`).join('') || '<tr><td colspan="8" class="muted">Nothing awaiting verification.</td></tr>';
+}
+
+function viewEvidence(url, mime) { showModal('<h3>Evidence</h3>' + mediaPreview(url, mime)); }
+
+async function verifyTask(id) {
+  const { ok, data } = await api('/api/admin/verify', { task_id: id });
+  if (!ok) return setMsg('verify-msg', data.error);
+  loadVerify();
+}
+async function returnTask(id) {
+  const { ok, data } = await api('/api/admin/return', { task_id: id });
+  if (!ok) return setMsg('verify-msg', data.error);
+  setMsg('verify-msg', 'Task sent back to the member.', true);
+  loadVerify();
+}
+async function verifyAll() {
+  const { ok, data } = await api('/api/admin/verify-all', {});
+  if (!ok) return setMsg('verify-msg', data.error);
+  setMsg('verify-msg', 'All pending tasks approved.', true);
+  loadVerify();
+}
+
+// ---- users ----
+async function loadUsers() {
+  const { data } = await api('/api/admin/users');
+  const tb = document.querySelector('#users tbody');
+  tb.innerHTML = (data.users || []).map(u => `
+    <tr>
+      <td class="${strikeClass(u.strikes)}">${esc(u.full_name)}${u.kicked?' <span class="badge returned">removed</span>':''}</td>
+      <td>${esc(u.student_id)}</td>
+      <td>${esc(u.grade)}</td>
+      <td>${u.officer_position?`<span class="badge officer">${esc(u.officer_position)}</span>`:'<span class="muted">Member</span>'}</td>
+      <td><b>${u.total.toFixed(2)}</b></td>
+      <td>${u.strikes>0?'⚠️ '+u.strikes:'0'}</td>
+      <td><button class="small secondary" onclick="openUser(${u.id})">View</button></td>
+    </tr>`).join('') || '<tr><td colspan="7" class="muted">No members yet.</td></tr>';
+}
+
+async function openUser(id) {
+  const { data } = await api('/api/admin/users/' + id);
+  if (!data.user) return;
+  const u = data.user;
+  const att = (data.attendance || []).map(a => `
+    <tr>
+      <td>${fmtDate(a.check_in)}</td>
+      <td>${a.check_out?fmtDate(a.check_out):'<span class="badge submitted">open</span>'}</td>
+      <td>${a.hours!=null?a.hours.toFixed(2):'—'}</td>
+      <td>${a.photo?`<img class="thumb" src="/uploads/${a.photo}" onclick="showModal('<img src=\\'/uploads/${a.photo}\\'>')">`:'<span class="muted">no photo</span>'}</td>
+    </tr>`).join('') || '<tr><td colspan="4" class="muted">No attendance.</td></tr>';
+
+  const tasks = (data.tasks || []).map(t => `
+    <tr>
+      <td>${esc(t.name)}</td>
+      <td>${t.difficulty}</td>
+      <td><span class="badge ${t.status}">${t.status}</span>${t.return_count?` (${t.return_count}×)`:''}</td>
+      <td>${t.evidence?`<span class="evidence-link" onclick='viewEvidence(${JSON.stringify(t.evidence)},${JSON.stringify(t.evidence_type||"")})'>evidence</span>`:'—'}</td>
+    </tr>`).join('') || '<tr><td colspan="4" class="muted">No tasks.</td></tr>';
+
+  const activity = (data.activity || []).map(a =>
+    `<li>${fmtDate(a.when)} — ${esc(a.what)}</li>`).join('') ||
+    '<li class="muted">No recent activity.</li>';
+
+  const strikes = (data.strikes || []).map(s =>
+    `<li>${fmtDate(s.created_at)} — ${esc(s.reason)}</li>`).join('') ||
+    '<li class="muted">No strikes.</li>';
+
+  showModal(`
+    <h2 class="${strikeClass(u.strikes)}">${esc(u.full_name)}</h2>
+    <p class="muted">ID ${esc(u.student_id)} · Grade ${esc(u.grade)} ·
+      ${u.officer_position?esc(u.officer_position):'Member'} ·
+      <b>${u.strikes}</b> strike(s)${u.kicked?' · <b style="color:var(--red)">REMOVED</b>':''}</p>
+    <div class="grid" style="margin:12px 0">
+      <div class="stat"><div class="n">${u.total.toFixed(2)}</div><div class="l">Total score</div></div>
+      <div class="stat"><div class="n">${u.attendance_score.toFixed(2)}</div><div class="l">Attendance (${u.total_hours}h)</div></div>
+      <div class="stat"><div class="n">${u.task_score.toFixed(2)}</div><div class="l">Tasks</div></div>
+      <div class="stat"><div class="n">-${u.late_penalty.toFixed(2)}</div><div class="l">Late penalty</div></div>
+    </div>
+
+    <div class="btnrow">
+      <button class="small" onclick="strike(${u.id})">⚠️ Give Strike</button>
+      <button class="small secondary" onclick="unstrike(${u.id})">Remove a Strike</button>
+      <button class="small red" onclick="kick(${u.id}, ${u.strikes})" ${u.kicked?'disabled':''}>Kick (3 strikes)</button>
+    </div>
+
+    <h3 style="margin-top:18px">Recent activity</h3>
+    <ul>${activity}</ul>
+
+    <h3>Attendance photos</h3>
+    <table><thead><tr><th>In</th><th>Out</th><th>Hours</th><th>Photo</th></tr></thead>
+      <tbody>${att}</tbody></table>
+
+    <h3 style="margin-top:14px">Task completions</h3>
+    <table><thead><tr><th>Task</th><th>Diff</th><th>Status</th><th>Evidence</th></tr></thead>
+      <tbody>${tasks}</tbody></table>
+
+    <h3 style="margin-top:14px">Strike history</h3>
+    <ul>${strikes}</ul>
+  `);
+}
+
+async function strike(id) {
+  const reason = prompt('Reason for the strike (e.g. faking attendance, work not done):', '');
+  if (reason === null) return;
+  const { ok, data } = await api('/api/admin/strike', { user_id: id, reason });
+  if (!ok) return alert(data.error);
+  closeModal(); loadUsers(); openUser(id);
+}
+async function unstrike(id) {
+  const { ok, data } = await api('/api/admin/unstrike', { user_id: id });
+  if (!ok) return alert(data.error);
+  closeModal(); loadUsers(); openUser(id);
+}
+async function kick(id, strikes) {
+  if (strikes < 3) return alert('A member can only be kicked at 3 strikes.');
+  if (!confirm('Remove this member from the team?')) return;
+  const { ok, data } = await api('/api/admin/kick', { user_id: id });
+  if (!ok) return alert(data.error);
+  closeModal(); loadUsers();
+}
+
+// ---- scoreboard ----
+async function loadScoreboard() {
+  const { data } = await api('/api/scoreboard');
+  const tb = document.querySelector('#scoreboard tbody');
+  tb.innerHTML = (data.scoreboard || []).map(r => `
+    <tr>
+      <td>${r.position}</td>
+      <td class="${strikeClass(r.strikes)}">${esc(r.full_name)}
+        ${r.officer_position?`<span class="badge officer">${esc(r.officer_position)}</span>`:''}</td>
+      <td>${r.attendance_score.toFixed(2)}</td>
+      <td>${r.task_score.toFixed(2)}</td>
+      <td>${r.late_penalty>0?'-'+r.late_penalty.toFixed(2):'0.00'}</td>
+      <td><b>${r.total.toFixed(2)}</b></td>
+      <td>${r.strikes>0?'⚠️ '+r.strikes:'—'}</td>
+    </tr>`).join('') || '<tr><td colspan="7" class="muted">No members yet.</td></tr>';
+}
+</script>
+</body>
+</html>

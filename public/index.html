@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MontaRanker — FRC 115</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="center-wrap">
+  <div class="auth-box">
+    <div class="auth-title">Monta<span>Ranker</span></div>
+    <div class="auth-sub">FRC Team 115 · Member &amp; Officer Portal</div>
+
+    <div class="card">
+      <div class="tabs">
+        <div class="tab active" data-view="login">Log In</div>
+        <div class="tab" data-view="signup">Sign Up</div>
+        <div class="tab" data-view="admin">Administrator</div>
+      </div>
+
+      <div id="msg"></div>
+
+      <!-- LOGIN -->
+      <div id="view-login">
+        <label>Student ID</label>
+        <input id="login-id" inputmode="numeric" placeholder="e.g. 1234567">
+        <label>Password</label>
+        <input id="login-pw" type="password" placeholder="Your password">
+        <div class="btnrow">
+          <button onclick="doLogin()">Log In</button>
+        </div>
+      </div>
+
+      <!-- SIGNUP -->
+      <div id="view-signup" class="hidden">
+        <label>Full Name</label>
+        <input id="su-name" placeholder="First Last">
+        <div class="row">
+          <div>
+            <label>Student ID (numbers only)</label>
+            <input id="su-id" inputmode="numeric" placeholder="1234567">
+          </div>
+          <div>
+            <label>Grade</label>
+            <select id="su-grade">
+              <option value="">Select…</option>
+              <option>9</option><option>10</option><option>11</option><option>12</option>
+            </select>
+          </div>
+        </div>
+        <label>Officer Position (leave as "None" if member)</label>
+        <select id="su-officer"><option value="">None</option></select>
+        <label>Password</label>
+        <input id="su-pw" type="password" placeholder="Choose a password">
+        <div class="btnrow">
+          <button onclick="doSignup()">Create Account</button>
+        </div>
+      </div>
+
+      <!-- ADMIN -->
+      <div id="view-admin" class="hidden">
+        <p class="muted">Administrator access can view every profile, verify tasks,
+          issue strikes and remove members.</p>
+        <label>Administrator Password</label>
+        <input id="admin-pw" type="password" placeholder="Administrator password"
+               onkeydown="if(event.key==='Enter')doAdmin()">
+        <div class="btnrow">
+          <button onclick="doAdmin()">Enter Admin</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const msg = (text, ok=false) => {
+  document.getElementById('msg').innerHTML =
+    text ? `<div class="msg ${ok?'ok':'error'}">${text}</div>` : '';
+};
+
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  ['login','signup','admin'].forEach(v =>
+    document.getElementById('view-' + v).classList.add('hidden'));
+  document.getElementById('view-' + t.dataset.view).classList.remove('hidden');
+  msg('');
+});
+
+async function api(path, body) {
+  const r = await fetch(path, {
+    method: body ? 'POST' : 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await r.json().catch(() => ({}));
+  return { ok: r.ok, data };
+}
+
+async function loadPositions() {
+  const { data } = await api('/api/officer-positions');
+  const sel = document.getElementById('su-officer');
+  (data.positions || []).forEach(p => {
+    const o = document.createElement('option');
+    o.value = p; o.textContent = p; sel.appendChild(o);
+  });
+}
+loadPositions();
+
+async function doLogin() {
+  const student_id = document.getElementById('login-id').value.trim();
+  const password = document.getElementById('login-pw').value;
+  const { ok, data } = await api('/api/login', { student_id, password });
+  if (!ok) return msg(data.error || 'Login failed.');
+  location.href = '/dashboard.html';
+}
+
+async function doSignup() {
+  const body = {
+    full_name: document.getElementById('su-name').value.trim(),
+    student_id: document.getElementById('su-id').value.trim(),
+    grade: document.getElementById('su-grade').value,
+    officer_position: document.getElementById('su-officer').value,
+    password: document.getElementById('su-pw').value,
+  };
+  const { ok, data } = await api('/api/signup', body);
+  if (!ok) return msg(data.error || 'Sign up failed.');
+  location.href = '/dashboard.html';
+}
+
+async function doAdmin() {
+  const password = document.getElementById('admin-pw').value;
+  const { ok, data } = await api('/api/admin-login', { password });
+  if (!ok) return msg(data.error || 'Login failed.');
+  location.href = '/admin.html';
+}
+
+// already logged in? bounce.
+(async () => {
+  const { data } = await api('/api/me');
+  if (data.user && data.user.role === 'admin') location.href = '/admin.html';
+  else if (data.user) location.href = '/dashboard.html';
+})();
+</script>
+</body>
+</html>

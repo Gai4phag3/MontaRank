@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard — MontaRanker</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">Monta<span>Ranker</span></div>
+  <div class="right">
+    <span id="whoami" class="muted"></span>
+    <button class="secondary small" onclick="logout()">Log Out</button>
+  </div>
+</div>
+
+<div class="container">
+  <div class="tabs">
+    <div class="tab active" data-view="attendance">Attendance</div>
+    <div class="tab" data-view="tasks">My Tasks</div>
+    <div class="tab hidden" id="tab-assign" data-view="assign">Assign Tasks</div>
+    <div class="tab" data-view="scoreboard">Scoreboard</div>
+  </div>
+
+  <!-- ATTENDANCE -->
+  <div id="view-attendance">
+    <div class="card">
+      <h2>Attendance</h2>
+      <p class="muted">Click <b>I'm Here</b> when you arrive. When you leave, click
+        <b>I'm Leaving</b> and take a photo of yourself in the lab to confirm.
+        You earn <b>0.1 points per hour</b>.</p>
+      <div id="att-status"></div>
+      <div id="att-msg"></div>
+      <div id="camera-area" class="hidden">
+        <p class="muted">Take a photo in the lab to check out (camera only — no uploads):</p>
+        <video id="video" autoplay playsinline></video>
+        <canvas id="canvas" class="hidden"></canvas>
+        <div class="btnrow">
+          <button id="snap-btn" onclick="snapAndCheckout()">📸 Capture &amp; Check Out</button>
+          <button class="secondary" onclick="cancelCamera()">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Recent attendance</h3>
+      <table id="att-history"><thead><tr>
+        <th>Check In</th><th>Check Out</th><th>Hours</th><th>Points</th><th>Photo</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <!-- MY TASKS -->
+  <div id="view-tasks" class="hidden">
+    <div class="card">
+      <h2>My Tasks</h2>
+      <p class="muted">Complete a task by submitting evidence (image, video, PDF or file).
+        Points = difficulty + days submitted early. Late submissions lose 0.2 pts/hour.</p>
+      <div id="tasks-msg"></div>
+      <table id="my-tasks"><thead><tr>
+        <th>Task</th><th>Difficulty</th><th>Deadline</th><th>Assigned By</th>
+        <th>Status</th><th></th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <!-- ASSIGN (officers) -->
+  <div id="view-assign" class="hidden">
+    <div class="card">
+      <h2>Assign a Task</h2>
+      <div id="assign-msg"></div>
+      <label>Task name</label>
+      <input id="t-name" placeholder="e.g. Wire the swerve module">
+      <div class="row">
+        <div>
+          <label>Difficulty (1–5)</label>
+          <select id="t-diff">
+            <option>1</option><option>2</option><option selected>3</option>
+            <option>4</option><option>5</option>
+          </select>
+        </div>
+        <div>
+          <label>Deadline (date &amp; time)</label>
+          <input id="t-deadline" type="datetime-local">
+        </div>
+      </div>
+      <label>Assign to</label>
+      <select id="t-assignee"></select>
+      <div class="btnrow"><button onclick="createTask()">Assign Task</button></div>
+    </div>
+
+    <div class="card">
+      <h3>Tasks I've assigned</h3>
+      <table id="assigned-tasks"><thead><tr>
+        <th>Task</th><th>Assignee</th><th>Difficulty</th><th>Deadline</th><th>Status</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <!-- SCOREBOARD -->
+  <div id="view-scoreboard" class="hidden">
+    <div class="card">
+      <h2>Scoreboard</h2>
+      <table id="scoreboard"><thead><tr>
+        <th>#</th><th>Name</th><th>Attendance</th><th>Tasks</th>
+        <th>Late Penalty</th><th>Total</th><th>Strikes</th>
+      </tr></thead><tbody></tbody></table>
+      <p class="muted" style="margin-top:10px">
+        Name color: <span class="strike1">1 strike</span> ·
+        <span class="strike2">2 strikes</span> ·
+        <span class="strike3">3 strikes</span></p>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="evidence-input" class="hidden">
+<script src="/common.js"></script>
+<script>
+let ME = null;
+let pendingEvidenceTaskId = null;
+let stream = null;
+
+function setMsg(id, text, ok=false) {
+  document.getElementById(id).innerHTML =
+    text ? `<div class="msg ${ok?'ok':'error'}">${text}</div>` : '';
+}
+
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  ['attendance','tasks','assign','scoreboard'].forEach(v =>
+    document.getElementById('view-' + v).classList.add('hidden'));
+  document.getElementById('view-' + t.dataset.view).classList.remove('hidden');
+  if (t.dataset.view === 'tasks') loadMyTasks();
+  if (t.dataset.view === 'assign') loadAssign();
+  if (t.dataset.view === 'scoreboard') loadScoreboard();
+  if (t.dataset.view === 'attendance') loadAttendance();
+});
+
+// ---- init ----
+(async () => {
+  const { data } = await api('/api/me');
+  if (!data.user) { location.href = '/'; return; }
+  if (data.user.role === 'admin') { location.href = '/admin.html'; return; }
+  ME = data.user;
+  document.getElementById('whoami').textContent =
+    ME.full_name + (ME.officer_position ? ' · ' + ME.officer_position : '');
+  if (ME.is_officer) document.getElementById('tab-assign').classList.remove('hidden');
+  loadAttendance();
+})();
+
+// ---- attendance ----
+async function loadAttendance() {
+  const { data } = await api('/api/attendance/status');
+  const el = document.getElementById('att-status');
+  if (data.open) {
+    el.innerHTML = `<div class="msg ok">✅ Checked in since <b>${fmtDate(data.open.check_in)}</b></div>`;
+    el.innerHTML += `<div class="btnrow"><button class="red" onclick="startCamera()">I'm Leaving — Take Photo</button></div>`;
+  } else {
+    el.innerHTML = `<div class="btnrow"><button class="green" onclick="checkin()">I'm Here — Check In</button></div>`;
+  }
+  const tb = document.querySelector('#att-history tbody');
+  tb.innerHTML = (data.history || []).map(a => `
+    <tr>
+      <td>${fmtDate(a.check_in)}</td>
+      <td>${a.check_out ? fmtDate(a.check_out) : '<span class="badge submitted">open</span>'}</td>
+      <td>${a.hours != null ? a.hours.toFixed(2) : '—'}</td>
+      <td>${a.hours != null ? (0.1*a.hours).toFixed(2) : '—'}</td>
+      <td>${a.photo ? `<img class="thumb" src="/uploads/${a.photo}" onclick="showModal('<img src=\\'/uploads/${a.photo}\\'>')">` : '—'}</td>
+    </tr>`).join('') || '<tr><td colspan="5" class="muted">No attendance yet.</td></tr>';
+}
+
+async function checkin() {
+  const { ok, data } = await api('/api/attendance/checkin', {});
+  if (!ok) return setMsg('att-msg', data.error);
+  setMsg('att-msg', '');
+  loadAttendance();
+}
+
+async function startCamera() {
+  document.getElementById('camera-area').classList.remove('hidden');
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+    document.getElementById('video').srcObject = stream;
+  } catch (e) {
+    setMsg('att-msg', 'Camera access is required to check out. Please allow the camera.');
+    document.getElementById('camera-area').classList.add('hidden');
+  }
+}
+
+function cancelCamera() {
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null;
+  document.getElementById('camera-area').classList.add('hidden');
+}
+
+async function snapAndCheckout() {
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  canvas.width = video.videoWidth || 640;
+  canvas.height = video.videoHeight || 480;
+  canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+  const photo = canvas.toDataURL('image/png');
+  const { ok, data } = await api('/api/attendance/checkout', { photo });
+  cancelCamera();
+  if (!ok) return setMsg('att-msg', data.error);
+  setMsg('att-msg', `Checked out — ${data.hours} hours, +${data.points} points!`, true);
+  loadAttendance();
+}
+
+// ---- my tasks ----
+async function loadMyTasks() {
+  const { data } = await api('/api/tasks/mine');
+  const tb = document.querySelector('#my-tasks tbody');
+  tb.innerHTML = (data.tasks || []).map(t => {
+    let action = '';
+    if (t.status === 'verified') action = '<span class="badge verified">✓ done</span>';
+    else if (t.status === 'submitted') action = '<span class="muted">awaiting review</span>';
+    else action = `<button class="small" onclick="submitEvidence(${t.id})">${t.status==='returned'?'Resubmit':'Complete'}</button>`;
+    return `<tr>
+      <td>${esc(t.name)}${t.return_count?` <span class="muted">(returned ${t.return_count}×)</span>`:''}</td>
+      <td>${t.difficulty}</td>
+      <td>${fmtDate(t.deadline)}</td>
+      <td>${esc(t.assigned_by_name)}</td>
+      <td><span class="badge ${t.status}">${t.status}</span></td>
+      <td>${action}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" class="muted">No tasks assigned to you.</td></tr>';
+}
+
+function submitEvidence(taskId) {
+  pendingEvidenceTaskId = taskId;
+  document.getElementById('evidence-input').click();
+}
+
+document.getElementById('evidence-input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file || pendingEvidenceTaskId == null) return;
+  setMsg('tasks-msg', 'Uploading evidence…', true);
+  const dataUrl = await fileToDataURL(file);
+  const { ok, data } = await api('/api/tasks/complete', {
+    task_id: pendingEvidenceTaskId, evidence: dataUrl, evidence_name: file.name,
+  });
+  pendingEvidenceTaskId = null;
+  if (!ok) return setMsg('tasks-msg', data.error);
+  setMsg('tasks-msg', 'Submitted! Awaiting administrator verification.', true);
+  loadMyTasks();
+});
+
+// ---- assign ----
+async function loadAssign() {
+  const m = await api('/api/members');
+  const sel = document.getElementById('t-assignee');
+  sel.innerHTML = (m.data.members || []).map(u =>
+    `<option value="${u.id}">${esc(u.full_name)} (${esc(u.grade)})</option>`).join('');
+  const a = await api('/api/tasks/assigned-by-me');
+  const tb = document.querySelector('#assigned-tasks tbody');
+  tb.innerHTML = (a.data.tasks || []).map(t => `
+    <tr>
+      <td>${esc(t.name)}</td>
+      <td>${esc(t.assignee_name)}</td>
+      <td>${t.difficulty}</td>
+      <td>${fmtDate(t.deadline)}</td>
+      <td><span class="badge ${t.status}">${t.status}</span></td>
+    </tr>`).join('') || '<tr><td colspan="5" class="muted">You haven\'t assigned any tasks.</td></tr>';
+}
+
+async function createTask() {
+  const body = {
+    name: document.getElementById('t-name').value.trim(),
+    difficulty: document.getElementById('t-diff').value,
+    deadline: document.getElementById('t-deadline').value,
+    assigned_to: document.getElementById('t-assignee').value,
+  };
+  const { ok, data } = await api('/api/tasks/create', body);
+  if (!ok) return setMsg('assign-msg', data.error);
+  setMsg('assign-msg', 'Task assigned!', true);
+  document.getElementById('t-name').value = '';
+  loadAssign();
+}
+
+// ---- scoreboard ----
+async function loadScoreboard() {
+  const { data } = await api('/api/scoreboard');
+  const tb = document.querySelector('#scoreboard tbody');
+  tb.innerHTML = (data.scoreboard || []).map(r => `
+    <tr>
+      <td>${r.position}</td>
+      <td class="${strikeClass(r.strikes)}">${esc(r.full_name)}
+        ${r.officer_position?`<span class="badge officer">${esc(r.officer_position)}</span>`:''}</td>
+      <td>${r.attendance_score.toFixed(2)}</td>
+      <td>${r.task_score.toFixed(2)}</td>
+      <td>${r.late_penalty>0?'-'+r.late_penalty.toFixed(2):'0.00'}</td>
+      <td><b>${r.total.toFixed(2)}</b></td>
+      <td>${r.strikes>0?'⚠️ '+r.strikes:'—'}</td>
+    </tr>`).join('') || '<tr><td colspan="7" class="muted">No members yet.</td></tr>';
+}
+</script>
+</body>
+</html>
