@@ -164,11 +164,11 @@ async function loadAttendance() {
   const tb = document.querySelector('#att-history tbody');
   tb.innerHTML = (data.history || []).map(a => `
     <tr>
-      <td>${fmtDate(a.check_in)}</td>
-      <td>${a.check_out ? fmtDate(a.check_out) : '<span class="badge submitted">open</span>'}</td>
-      <td>${a.hours != null ? a.hours.toFixed(2) : '—'}</td>
-      <td>${a.hours != null ? (0.1*a.hours).toFixed(2) : '—'}</td>
-      <td>${a.photo ? `<img class="thumb" src="${mediaURL(a.photo)}" onclick="showModal('<img src=\\'${mediaURL(a.photo)}\\'>')">` : '—'}</td>
+      <td data-label="Check In">${fmtDate(a.check_in)}</td>
+      <td data-label="Check Out">${a.check_out ? fmtDate(a.check_out) : '<span class="badge submitted">open</span>'}</td>
+      <td data-label="Hours">${a.hours != null ? a.hours.toFixed(2) : '—'}</td>
+      <td data-label="Points">${a.hours != null ? (0.1*a.hours).toFixed(2) : '—'}</td>
+      <td data-label="Photo">${a.photo ? `<img class="thumb" src="${mediaURL(a.photo)}" onclick="showModal('<img src=\\'${mediaURL(a.photo)}\\'>')">` : '—'}</td>
     </tr>`).join('') || '<tr><td colspan="5" class="muted">No attendance yet.</td></tr>';
 }
 
@@ -238,11 +238,11 @@ async function loadMyTasks() {
     if (isOverdue) statusCell += ` <span class="badge overdue">⏰ ${fmtLate(late)}</span>`;
     else if (late != null) statusCell += ` <span class="badge overdue">submitted ${fmtLate(late)}</span>`;
     return `<tr class="${isOverdue?'late-row':''}">
-      <td>${esc(t.name)}${t.return_count?` <span class="muted">(returned ${t.return_count}×)</span>`:''}</td>
-      <td>${t.difficulty}</td>
-      <td>${fmtDate(t.deadline)}</td>
-      <td>${esc(t.assigned_by_name)}</td>
-      <td>${statusCell}</td>
+      <td data-label="Task">${esc(t.name)}${t.return_count?` <span class="muted">(returned ${t.return_count}×)</span>`:''}</td>
+      <td data-label="Difficulty">${t.difficulty}</td>
+      <td data-label="Deadline">${fmtDate(t.deadline)}</td>
+      <td data-label="Assigned By">${esc(t.assigned_by_name)}</td>
+      <td data-label="Status">${statusCell}</td>
       <td>${action}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="6" class="muted">No tasks assigned to you.</td></tr>';
@@ -284,11 +284,11 @@ async function loadAssign() {
   const tb = document.querySelector('#assigned-tasks tbody');
   tb.innerHTML = (a.data.tasks || []).map(t => `
     <tr>
-      <td>${esc(t.name)}</td>
-      <td>${esc(t.assignee_name)}</td>
-      <td>${t.difficulty}</td>
-      <td>${fmtDate(t.deadline)}</td>
-      <td><span class="badge ${t.status}">${t.status}</span></td>
+      <td data-label="Task">${esc(t.name)}</td>
+      <td data-label="Assignee">${esc(t.assignee_name)}</td>
+      <td data-label="Difficulty">${t.difficulty}</td>
+      <td data-label="Deadline">${fmtDate(t.deadline)}</td>
+      <td data-label="Status"><span class="badge ${t.status}">${t.status}</span></td>
     </tr>`).join('') || '<tr><td colspan="5" class="muted">You haven\'t assigned any tasks.</td></tr>';
 }
 
@@ -312,14 +312,14 @@ async function loadScoreboard() {
   const tb = document.querySelector('#scoreboard tbody');
   tb.innerHTML = (data.scoreboard || []).map(r => `
     <tr>
-      <td>${r.position}</td>
-      <td class="${strikeClass(r.strikes)}">${esc(r.full_name)}
+      <td data-label="Rank">${r.position}</td>
+      <td data-label="Name" class="${strikeClass(r.strikes)}">${esc(r.full_name)}
         ${r.officer_position?`<span class="badge officer">${esc(r.officer_position)}</span>`:''}</td>
-      <td>${r.attendance_score.toFixed(2)}</td>
-      <td>${r.task_score.toFixed(2)}</td>
-      <td>${r.late_penalty>0?'-'+r.late_penalty.toFixed(2):'0.00'}</td>
-      <td><b>${r.total.toFixed(2)}</b></td>
-      <td>${r.strikes>0?'⚠️ '+r.strikes:'—'}</td>
+      <td data-label="Attendance">${r.attendance_score.toFixed(2)}</td>
+      <td data-label="Tasks">${r.task_score.toFixed(2)}</td>
+      <td data-label="Late Penalty">${r.late_penalty>0?'-'+r.late_penalty.toFixed(2):'0.00'}</td>
+      <td data-label="Total"><b>${r.total.toFixed(2)}</b></td>
+      <td data-label="Strikes">${r.strikes>0?'⚠️ '+r.strikes:'—'}</td>
     </tr>`).join('') || '<tr><td colspan="7" class="muted">No members yet.</td></tr>';
 }
 </script>

@@ -392,12 +392,42 @@ video, canvas {
             text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
 
   /* wide tables scroll sideways inside their card instead of breaking the page */
-  .card { padding: 16px; overflow-x: auto; }
+  .card { padding: 16px; }
   .card h2 { font-size: 17px; }
   /* buttons that float in a heading drop below it instead of overlapping the title */
   .card h2 button { float: none !important; display: block; margin-top: 10px; }
-  th, td { padding: 8px 9px; }
-  table { min-width: 460px; }
+
+  /* stack each row into its own little card so the table fits the screen */
+  table thead { display: none; }
+  table, table tbody, table tr, table td { display: block; width: 100%; }
+  table tr {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 10px;
+    padding: 4px 12px;
+    background: rgba(139, 92, 246, .06);
+  }
+  table tbody tr:hover td { background: transparent; }
+  table td {
+    border: none;
+    padding: 7px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    text-align: right;
+  }
+  table td + td { border-top: 1px solid var(--border-soft); }
+  table td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-weight: 600;
+    text-align: left;
+    white-space: nowrap;
+  }
+  /* "no data yet" rows that span the whole table */
+  table td[colspan] { justify-content: center; text-align: center; }
+  table td[colspan]::before { display: none; }
 
   .grid { grid-template-columns: 1fr 1fr; }
   .score-big { font-size: 26px; }

@@ -141,11 +141,11 @@ async function loadHome() {
     <div class="stat"><div class="n">${s.total_strikes}</div><div class="l">Total strikes</div></div>`;
   document.querySelector('#hardest tbody').innerHTML =
     (data.hardest_workers || []).map((h,i) =>
-      `<tr><td>${i+1}</td><td>${esc(h.full_name)}</td><td><b>${h.difficulty}</b> diff pts</td></tr>`
+      `<tr><td data-label="#">${i+1}</td><td data-label="Name">${esc(h.full_name)}</td><td data-label="Difficulty"><b>${h.difficulty}</b> diff pts</td></tr>`
     ).join('') || '<tr><td class="muted">No data.</td></tr>';
   document.querySelector('#leaders tbody').innerHTML =
     (data.leaders || []).map((h,i) =>
-      `<tr><td>${i+1}</td><td class="${strikeClass(h.strikes)}">${esc(h.full_name)}</td><td><b>${h.total.toFixed(2)}</b></td></tr>`
+      `<tr><td data-label="#">${i+1}</td><td data-label="Name" class="${strikeClass(h.strikes)}">${esc(h.full_name)}</td><td data-label="Total"><b>${h.total.toFixed(2)}</b></td></tr>`
     ).join('') || '<tr><td class="muted">No data.</td></tr>';
 }
 
@@ -155,13 +155,13 @@ async function loadVerify() {
   const tb = document.querySelector('#pending tbody');
   tb.innerHTML = (data.tasks || []).map(t => `
     <tr>
-      <td>${esc(t.name)}</td>
-      <td>${esc(t.assignee_name)}</td>
-      <td>${t.difficulty}</td>
-      <td>${fmtDate(t.deadline)}</td>
-      <td>${fmtDate(t.submitted_at)}</td>
-      <td>${t.evidence?`<span class="evidence-link" onclick='viewEvidence(${JSON.stringify(t.evidence)},${JSON.stringify(t.evidence_type||"")})'>view</span>`:'—'}</td>
-      <td>${t.return_count}${t.return_count>=2?' <span class="muted">(no diff pts)</span>':''}</td>
+      <td data-label="Task">${esc(t.name)}</td>
+      <td data-label="Member">${esc(t.assignee_name)}</td>
+      <td data-label="Difficulty">${t.difficulty}</td>
+      <td data-label="Deadline">${fmtDate(t.deadline)}</td>
+      <td data-label="Submitted">${fmtDate(t.submitted_at)}</td>
+      <td data-label="Evidence">${t.evidence?`<span class="evidence-link" onclick='viewEvidence(${JSON.stringify(t.evidence)},${JSON.stringify(t.evidence_type||"")})'>view</span>`:'—'}</td>
+      <td data-label="Returns">${t.return_count}${t.return_count>=2?' <span class="muted">(no diff pts)</span>':''}</td>
       <td>
         <button class="small green" onclick="verifyTask(${t.id})">Approve</button>
         <button class="small secondary" onclick="returnTask(${t.id})">Send back</button>
@@ -199,13 +199,13 @@ async function loadLate() {
   const tb = document.querySelector('#late-tasks tbody');
   tb.innerHTML = tasks.map(t => `
     <tr class="late-row">
-      <td>${esc(t.name)}</td>
-      <td>${esc(t.assignee_name)}</td>
-      <td>${esc(t.assignee_grade)}</td>
-      <td>${t.difficulty}</td>
-      <td>${fmtDate(t.deadline)}</td>
-      <td><span class="badge overdue">${fmtLate(t.hours_late)}</span></td>
-      <td>${t.submitted_late
+      <td data-label="Task">${esc(t.name)}</td>
+      <td data-label="Member">${esc(t.assignee_name)}</td>
+      <td data-label="Grade">${esc(t.assignee_grade)}</td>
+      <td data-label="Difficulty">${t.difficulty}</td>
+      <td data-label="Deadline">${fmtDate(t.deadline)}</td>
+      <td data-label="How Late"><span class="badge overdue">${fmtLate(t.hours_late)}</span></td>
+      <td data-label="Status">${t.submitted_late
             ? '<span class="badge submitted">submitted late</span>'
             : '<span class="badge '+t.status+'">not turned in</span>'}</td>
     </tr>`).join('') || '<tr><td colspan="7" class="muted">No late tasks.</td></tr>';
@@ -217,12 +217,12 @@ async function loadUsers() {
   const tb = document.querySelector('#users tbody');
   tb.innerHTML = (data.users || []).map(u => `
     <tr>
-      <td class="${strikeClass(u.strikes)}">${esc(u.full_name)}${u.kicked?' <span class="badge returned">removed</span>':''}</td>
-      <td>${esc(u.student_id)}</td>
-      <td>${esc(u.grade)}</td>
-      <td>${u.officer_position?`<span class="badge officer">${esc(u.officer_position)}</span>`:'<span class="muted">Member</span>'}</td>
-      <td><b>${u.total.toFixed(2)}</b></td>
-      <td>${u.strikes>0?'⚠️ '+u.strikes:'0'}</td>
+      <td data-label="Name" class="${strikeClass(u.strikes)}">${esc(u.full_name)}${u.kicked?' <span class="badge returned">removed</span>':''}</td>
+      <td data-label="ID">${esc(u.student_id)}</td>
+      <td data-label="Grade">${esc(u.grade)}</td>
+      <td data-label="Position">${u.officer_position?`<span class="badge officer">${esc(u.officer_position)}</span>`:'<span class="muted">Member</span>'}</td>
+      <td data-label="Total"><b>${u.total.toFixed(2)}</b></td>
+      <td data-label="Strikes">${u.strikes>0?'⚠️ '+u.strikes:'0'}</td>
       <td><button class="small secondary" onclick="openUser(${u.id})">View</button></td>
     </tr>`).join('') || '<tr><td colspan="7" class="muted">No members yet.</td></tr>';
 }
@@ -233,18 +233,18 @@ async function openUser(id) {
   const u = data.user;
   const att = (data.attendance || []).map(a => `
     <tr>
-      <td>${fmtDate(a.check_in)}</td>
-      <td>${a.check_out?fmtDate(a.check_out):'<span class="badge submitted">open</span>'}</td>
-      <td>${a.hours!=null?a.hours.toFixed(2):'—'}</td>
-      <td>${a.photo?`<img class="thumb" src="${mediaURL(a.photo)}" onclick="showModal('<img src=\\'${mediaURL(a.photo)}\\'>')">`:'<span class="muted">no photo</span>'}</td>
+      <td data-label="In">${fmtDate(a.check_in)}</td>
+      <td data-label="Out">${a.check_out?fmtDate(a.check_out):'<span class="badge submitted">open</span>'}</td>
+      <td data-label="Hours">${a.hours!=null?a.hours.toFixed(2):'—'}</td>
+      <td data-label="Photo">${a.photo?`<img class="thumb" src="${mediaURL(a.photo)}" onclick="showModal('<img src=\\'${mediaURL(a.photo)}\\'>')">`:'<span class="muted">no photo</span>'}</td>
     </tr>`).join('') || '<tr><td colspan="4" class="muted">No attendance.</td></tr>';
 
   const tasks = (data.tasks || []).map(t => `
     <tr>
-      <td>${esc(t.name)}</td>
-      <td>${t.difficulty}</td>
-      <td><span class="badge ${t.status}">${t.status}</span>${t.return_count?` (${t.return_count}×)`:''}</td>
-      <td>${t.evidence?`<span class="evidence-link" onclick='viewEvidence(${JSON.stringify(t.evidence)},${JSON.stringify(t.evidence_type||"")})'>evidence</span>`:'—'}</td>
+      <td data-label="Task">${esc(t.name)}</td>
+      <td data-label="Diff">${t.difficulty}</td>
+      <td data-label="Status"><span class="badge ${t.status}">${t.status}</span>${t.return_count?` (${t.return_count}×)`:''}</td>
+      <td data-label="Evidence">${t.evidence?`<span class="evidence-link" onclick='viewEvidence(${JSON.stringify(t.evidence)},${JSON.stringify(t.evidence_type||"")})'>evidence</span>`:'—'}</td>
     </tr>`).join('') || '<tr><td colspan="4" class="muted">No tasks.</td></tr>';
 
   const activity = (data.activity || []).map(a =>
@@ -333,14 +333,14 @@ async function loadScoreboard() {
   const tb = document.querySelector('#scoreboard tbody');
   tb.innerHTML = (data.scoreboard || []).map(r => `
     <tr>
-      <td>${r.position}</td>
-      <td class="${strikeClass(r.strikes)}">${esc(r.full_name)}
+      <td data-label="Rank">${r.position}</td>
+      <td data-label="Name" class="${strikeClass(r.strikes)}">${esc(r.full_name)}
         ${r.officer_position?`<span class="badge officer">${esc(r.officer_position)}</span>`:''}</td>
-      <td>${r.attendance_score.toFixed(2)}</td>
-      <td>${r.task_score.toFixed(2)}</td>
-      <td>${r.late_penalty>0?'-'+r.late_penalty.toFixed(2):'0.00'}</td>
-      <td><b>${r.total.toFixed(2)}</b></td>
-      <td>${r.strikes>0?'⚠️ '+r.strikes:'—'}</td>
+      <td data-label="Attendance">${r.attendance_score.toFixed(2)}</td>
+      <td data-label="Tasks">${r.task_score.toFixed(2)}</td>
+      <td data-label="Late Penalty">${r.late_penalty>0?'-'+r.late_penalty.toFixed(2):'0.00'}</td>
+      <td data-label="Total"><b>${r.total.toFixed(2)}</b></td>
+      <td data-label="Strikes">${r.strikes>0?'⚠️ '+r.strikes:'—'}</td>
     </tr>`).join('') || '<tr><td colspan="7" class="muted">No members yet.</td></tr>';
 }
 </script>
