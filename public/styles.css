@@ -402,32 +402,41 @@ video, canvas {
   table, table tbody, table tr, table td { display: block; width: 100%; }
   table tr {
     border: 1px solid var(--border);
-    border-radius: 10px;
-    margin-bottom: 10px;
-    padding: 4px 12px;
-    background: rgba(139, 92, 246, .06);
+    border-radius: 13px;
+    margin-bottom: 12px;
+    padding: 4px 15px;
+    background: linear-gradient(180deg, var(--panel2), var(--panel));
+    box-shadow: 0 8px 20px -16px rgba(0,0,0,.8);
   }
+  table tr.late-row { background: rgba(239,75,87,.09); border-color: rgba(239,75,87,.45); }
   table tbody tr:hover td { background: transparent; }
   table td {
     border: none;
-    padding: 7px 0;
+    border-top: 1px solid var(--border-soft);
+    padding: 11px 0;
     display: flex;
-    justify-content: space-between;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 14px;
+    justify-content: flex-end;
+    gap: 8px;
     text-align: right;
+    word-break: break-word;
   }
-  table td + td { border-top: 1px solid var(--border-soft); }
+  table tr td:first-child { border-top: none; }
   table td::before {
     content: attr(data-label);
+    margin-right: auto;          /* label hugs the left, value(s) go right */
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: .5px;
+    font-weight: 700;
     color: var(--muted);
-    font-weight: 600;
-    text-align: left;
     white-space: nowrap;
   }
+  table td:not([data-label])::before { content: none; }
   /* "no data yet" rows that span the whole table */
-  table td[colspan] { justify-content: center; text-align: center; }
-  table td[colspan]::before { display: none; }
+  table td[colspan] { justify-content: center; text-align: center; color: var(--muted); }
+  table td[colspan]::before { content: none; }
 
   .grid { grid-template-columns: 1fr 1fr; }
   .score-big { font-size: 26px; }
