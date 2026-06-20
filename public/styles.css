@@ -448,3 +448,64 @@ video, canvas {
   .grid { grid-template-columns: 1fr; }
   .tab { padding: 8px; font-size: 12px; }
 }
+
+/* leaderboard-style scoreboard cards on phones */
+@media (max-width: 720px) {
+  #scoreboard tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+    padding: 13px 15px;
+  }
+  #scoreboard td { border: none; padding: 0; }
+
+  /* rank in a gold circle */
+  #scoreboard td[data-label="Rank"] {
+    order: 1; flex: 0 0 auto;
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: rgba(245, 207, 99, .13);
+    border: 1px solid var(--gold-dim);
+    color: var(--gold);
+    font-size: 14px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #scoreboard td[data-label="Rank"]::before { content: none; }
+
+  /* name takes the middle, bold */
+  #scoreboard td[data-label="Name"] {
+    order: 2; flex: 1 1 40%;
+    justify-content: flex-start; text-align: left;
+    font-size: 16px; font-weight: 700; gap: 6px;
+  }
+  #scoreboard td[data-label="Name"]::before { content: none; }
+
+  /* total: big gold number on the right */
+  #scoreboard td[data-label="Total"] {
+    order: 3; flex: 0 0 auto;
+    font-size: 19px; font-weight: 800; color: var(--gold);
+  }
+  #scoreboard td[data-label="Total"]::before {
+    content: "TOTAL"; margin: 0 6px 0 0; font-size: 9px;
+  }
+
+  /* breakdown stats sit on a second line */
+  #scoreboard td[data-label="Attendance"],
+  #scoreboard td[data-label="Tasks"],
+  #scoreboard td[data-label="Late Penalty"],
+  #scoreboard td[data-label="Strikes"] {
+    order: 4; flex: 1 1 0; min-width: 62px;
+    display: flex; flex-direction: column; align-items: flex-start;
+    gap: 1px; text-align: left;
+    font-size: 14px; font-weight: 600;
+    margin-top: 9px; padding-top: 10px;
+    border-top: 1px solid var(--border-soft);
+  }
+  #scoreboard td[data-label="Attendance"]::before,
+  #scoreboard td[data-label="Tasks"]::before,
+  #scoreboard td[data-label="Late Penalty"]::before,
+  #scoreboard td[data-label="Strikes"]::before {
+    margin: 0; font-size: 9px; letter-spacing: .3px;
+  }
+}
