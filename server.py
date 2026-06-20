@@ -195,6 +195,28 @@ def compute_scores(conn, user_id):
     }
 
 
+def task_hours_late(row, now):
+    """Hours a task is late, or None if it isn't late.
+
+    - verified tasks are never 'late' here
+    - submitted tasks: measured at submission time vs deadline
+    - not-yet-submitted tasks: measured against 'now' (and still growing)
+    """
+    if row["status"] == "verified":
+        return None
+    deadline = parse_dt(row["deadline"])
+    if not deadline:
+        return None
+    if row["submitted_at"]:
+        submitted = parse_dt(row["submitted_at"])
+        if submitted and submitted > deadline:
+            return math.ceil((submitted - deadline).total_seconds() / 3600)
+        return None
+    if now > deadline:
+        return math.ceil((now - deadline).total_seconds() / 3600)
+    return None
+
+
 def user_public(row):
     return {
         "id": row["id"],
@@ -442,6 +464,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return
             return self._admin_home()
 
+        if path == "/api/admin/late-tasks":
+            if not self._require_admin():
+                return
+            return self._admin_late_tasks()
+
         return self._error("Not found", 404)
 
     # -- API POST -----------------------------------------------------------
@@ -477,6 +504,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._admin_unstrike()
         if path == "/api/admin/kick":
             return self._admin_kick()
+        if path == "/api/admin/delete":
+            return self._admin_delete()
+        if path == "/api/admin/clear-all":
+            return self._admin_clear_all()
 
         return self._error("Not found", 404)
 
@@ -520,15 +551,20 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def _login(self):
         d = self._read_json()
-        student_id = (d.get("student_id") or "").strip()
+        full_name = (d.get("full_name") or "").strip()
         password = d.get("password") or ""
         conn = get_db()
-        row = conn.execute(
-            "SELECT * FROM users WHERE student_id=?", (student_id,)
-        ).fetchone()
+        rows = conn.execute(
+            "SELECT * FROM users WHERE lower(full_name)=lower(?)", (full_name,)
+        ).fetchall()
         conn.close()
-        if not row:
-            return self._error("No account with that student ID.", 401)
+        if not rows:
+            return self._error("No account with that name.", 401)
+        if len(rows) > 1:
+            return self._error(
+                "More than one account uses that name. Please contact an administrator.",
+                401)
+        row = rows[0]
         h, _ = hash_password(password, row["salt"])
         if h != row["password_hash"]:
             return self._error("Incorrect password.", 401)
@@ -809,6 +845,27 @@ class Handler(http.server.BaseHTTPRequestHandler):
             "leaders": leaders[:5],
         })
 
+    def _admin_late_tasks(self):
+        now = datetime.now()
+        conn = get_db()
+        rows = conn.execute(
+            "SELECT t.*, u.full_name AS assignee_name, u.grade AS assignee_grade "
+            "FROM tasks t JOIN users u ON u.id=t.assigned_to "
+            "WHERE t.status != 'verified'"
+        ).fetchall()
+        conn.close()
+        out = []
+        for r in rows:
+            hl = task_hours_late(r, now)
+            if hl is None:
+                continue
+            d = dict(r)
+            d["hours_late"] = hl
+            d["submitted_late"] = bool(r["submitted_at"])
+            out.append(d)
+        out.sort(key=lambda x: x["hours_late"], reverse=True)
+        self._send_json({"tasks": out})
+
     def _admin_verify(self):
         if not self._require_admin():
             return
@@ -923,6 +980,39 @@ class Handler(http.server.BaseHTTPRequestHandler):
             conn.close()
             return self._error("A member can only be kicked at 3 strikes.")
         conn.execute("UPDATE users SET kicked=1 WHERE id=?", (uid,))
+        conn.commit()
+        conn.close()
+        self._send_json({"ok": True})
+
+    def _admin_delete(self):
+        if not self._require_admin():
+            return
+        d = self._read_json()
+        try:
+            uid = int(d.get("user_id"))
+        except (TypeError, ValueError):
+            return self._error("Bad user id.")
+        conn = get_db()
+        row = conn.execute("SELECT id FROM users WHERE id=?", (uid,)).fetchone()
+        if not row:
+            conn.close()
+            return self._error("User not found", 404)
+        conn.execute("DELETE FROM attendance WHERE user_id=?", (uid,))
+        conn.execute("DELETE FROM tasks WHERE assigned_to=?", (uid,))
+        conn.execute("DELETE FROM strike_log WHERE user_id=?", (uid,))
+        conn.execute("DELETE FROM users WHERE id=?", (uid,))
+        conn.commit()
+        conn.close()
+        self._send_json({"ok": True})
+
+    def _admin_clear_all(self):
+        if not self._require_admin():
+            return
+        conn = get_db()
+        conn.execute("DELETE FROM strike_log")
+        conn.execute("DELETE FROM tasks")
+        conn.execute("DELETE FROM attendance")
+        conn.execute("DELETE FROM users")
         conn.commit()
         conn.close()
         self._send_json({"ok": True})

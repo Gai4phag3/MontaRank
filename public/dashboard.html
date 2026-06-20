@@ -8,7 +8,7 @@
 </head>
 <body>
 <div class="topbar">
-  <div class="brand">Monta<span>Ranker</span></div>
+  <div class="brand"><span class="bull">🐂</span>Monta<span>Ranker</span></div>
   <div class="right">
     <span id="whoami" class="muted"></span>
     <button class="secondary small" onclick="logout()">Log Out</button>
@@ -58,6 +58,7 @@
       <p class="muted">Complete a task by submitting evidence (image, video, PDF or file).
         Points = difficulty + days submitted early. Late submissions lose 0.2 pts/hour.</p>
       <div id="tasks-msg"></div>
+      <div id="tasks-banner"></div>
       <table id="my-tasks"><thead><tr>
         <th>Task</th><th>Difficulty</th><th>Deadline</th><th>Assigned By</th>
         <th>Status</th><th></th>
@@ -215,18 +216,33 @@ async function snapAndCheckout() {
 // ---- my tasks ----
 async function loadMyTasks() {
   const { data } = await api('/api/tasks/mine');
+  const tasks = data.tasks || [];
+  // overdue = not submitted yet and past deadline (still needs action)
+  const overdueCount = tasks.filter(t =>
+    (t.status === 'assigned' || t.status === 'returned') && taskHoursLate(t) != null).length;
+  const banner = document.getElementById('tasks-banner');
+  banner.innerHTML = overdueCount
+    ? `<div class="late-banner">⏰ You have ${overdueCount} overdue task${overdueCount>1?'s':''} — turn them in to limit the late penalty.</div>`
+    : '';
+
   const tb = document.querySelector('#my-tasks tbody');
-  tb.innerHTML = (data.tasks || []).map(t => {
+  tb.innerHTML = tasks.map(t => {
+    const late = taskHoursLate(t);
+    const needsAction = t.status === 'assigned' || t.status === 'returned';
+    const isOverdue = late != null && needsAction;
     let action = '';
     if (t.status === 'verified') action = '<span class="badge verified">✓ done</span>';
     else if (t.status === 'submitted') action = '<span class="muted">awaiting review</span>';
     else action = `<button class="small" onclick="submitEvidence(${t.id})">${t.status==='returned'?'Resubmit':'Complete'}</button>`;
-    return `<tr>
+    let statusCell = `<span class="badge ${t.status}">${t.status}</span>`;
+    if (isOverdue) statusCell += ` <span class="badge overdue">⏰ ${fmtLate(late)}</span>`;
+    else if (late != null) statusCell += ` <span class="badge overdue">submitted ${fmtLate(late)}</span>`;
+    return `<tr class="${isOverdue?'late-row':''}">
       <td>${esc(t.name)}${t.return_count?` <span class="muted">(returned ${t.return_count}×)</span>`:''}</td>
       <td>${t.difficulty}</td>
       <td>${fmtDate(t.deadline)}</td>
       <td>${esc(t.assigned_by_name)}</td>
-      <td><span class="badge ${t.status}">${t.status}</span></td>
+      <td>${statusCell}</td>
       <td>${action}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="6" class="muted">No tasks assigned to you.</td></tr>';

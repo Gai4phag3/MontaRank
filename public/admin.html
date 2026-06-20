@@ -8,7 +8,7 @@
 </head>
 <body>
 <div class="topbar">
-  <div class="brand">Monta<span>Ranker</span> · Admin</div>
+  <div class="brand"><span class="bull">🐂</span>Monta<span>Ranker</span> · Admin</div>
   <div class="right">
     <span class="muted">Administrator</span>
     <button class="secondary small" onclick="logout()">Log Out</button>
@@ -19,6 +19,7 @@
   <div class="tabs">
     <div class="tab active" data-view="home">Home</div>
     <div class="tab" data-view="verify">Verifications</div>
+    <div class="tab" data-view="late">⏰ Late Tasks</div>
     <div class="tab" data-view="users">Members</div>
     <div class="tab" data-view="scoreboard">Scoreboard</div>
   </div>
@@ -59,10 +60,29 @@
     </div>
   </div>
 
+  <!-- LATE TASKS -->
+  <div id="view-late" class="hidden">
+    <div class="card">
+      <h2>Current Late Tasks
+        <button class="small secondary" style="float:right" onclick="loadLate()">Refresh</button>
+      </h2>
+      <p class="muted">Tasks past their deadline that aren't verified yet — either not turned
+        in (member is overdue) or submitted late (penalty pending).</p>
+      <div id="late-summary"></div>
+      <table id="late-tasks"><thead><tr>
+        <th>Task</th><th>Member</th><th>Grade</th><th>Difficulty</th>
+        <th>Deadline</th><th>How Late</th><th>Status</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+
   <!-- USERS -->
   <div id="view-users" class="hidden">
     <div class="card">
-      <h2>Members</h2>
+      <h2>Members
+        <button class="small red" style="float:right" onclick="clearAll()">🗑 Clear All Accounts</button>
+      </h2>
+      <div id="users-msg"></div>
       <table id="users"><thead><tr>
         <th>Name</th><th>ID</th><th>Grade</th><th>Position</th>
         <th>Total</th><th>Strikes</th><th></th>
@@ -92,11 +112,12 @@ function setMsg(id, text, ok=false) {
 document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
   document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
   t.classList.add('active');
-  ['home','verify','users','scoreboard'].forEach(v =>
+  ['home','verify','late','users','scoreboard'].forEach(v =>
     document.getElementById('view-' + v).classList.add('hidden'));
   document.getElementById('view-' + t.dataset.view).classList.remove('hidden');
   if (t.dataset.view === 'home') loadHome();
   if (t.dataset.view === 'verify') loadVerify();
+  if (t.dataset.view === 'late') loadLate();
   if (t.dataset.view === 'users') loadUsers();
   if (t.dataset.view === 'scoreboard') loadScoreboard();
 });
@@ -168,6 +189,28 @@ async function verifyAll() {
   loadVerify();
 }
 
+// ---- late tasks ----
+async function loadLate() {
+  const { data } = await api('/api/admin/late-tasks');
+  const tasks = data.tasks || [];
+  document.getElementById('late-summary').innerHTML = tasks.length
+    ? `<div class="late-banner">⏰ ${tasks.length} late task${tasks.length>1?'s':''} across the team.</div>`
+    : '<div class="msg ok">🎉 No late tasks right now.</div>';
+  const tb = document.querySelector('#late-tasks tbody');
+  tb.innerHTML = tasks.map(t => `
+    <tr class="late-row">
+      <td>${esc(t.name)}</td>
+      <td>${esc(t.assignee_name)}</td>
+      <td>${esc(t.assignee_grade)}</td>
+      <td>${t.difficulty}</td>
+      <td>${fmtDate(t.deadline)}</td>
+      <td><span class="badge overdue">${fmtLate(t.hours_late)}</span></td>
+      <td>${t.submitted_late
+            ? '<span class="badge submitted">submitted late</span>'
+            : '<span class="badge '+t.status+'">not turned in</span>'}</td>
+    </tr>`).join('') || '<tr><td colspan="7" class="muted">No late tasks.</td></tr>';
+}
+
 // ---- users ----
 async function loadUsers() {
   const { data } = await api('/api/admin/users');
@@ -228,6 +271,7 @@ async function openUser(id) {
       <button class="small" onclick="strike(${u.id})">⚠️ Give Strike</button>
       <button class="small secondary" onclick="unstrike(${u.id})">Remove a Strike</button>
       <button class="small red" onclick="kick(${u.id}, ${u.strikes})" ${u.kicked?'disabled':''}>Kick (3 strikes)</button>
+      <button class="small red" onclick="delUser(${u.id})">🗑 Delete Account</button>
     </div>
 
     <h3 style="margin-top:18px">Recent activity</h3>
@@ -264,6 +308,23 @@ async function kick(id, strikes) {
   const { ok, data } = await api('/api/admin/kick', { user_id: id });
   if (!ok) return alert(data.error);
   closeModal(); loadUsers();
+}
+async function delUser(id) {
+  if (!confirm('Permanently DELETE this account and all of its attendance, tasks and strikes?\nThis cannot be undone.')) return;
+  const { ok, data } = await api('/api/admin/delete', { user_id: id });
+  if (!ok) return alert(data.error);
+  closeModal(); loadUsers(); loadHome();
+}
+async function clearAll() {
+  const t = prompt('This DELETES EVERY account and ALL data permanently.\nType  DELETE ALL  to confirm:');
+  if (t !== 'DELETE ALL') {
+    if (t !== null) setMsg('users-msg', 'Cancelled — confirmation text did not match.');
+    return;
+  }
+  const { ok, data } = await api('/api/admin/clear-all', {});
+  if (!ok) return setMsg('users-msg', data.error);
+  setMsg('users-msg', 'All accounts cleared.', true);
+  loadUsers(); loadHome();
 }
 
 // ---- scoreboard ----

@@ -18,6 +18,26 @@ function fmtDate(iso) {
     hour: '2-digit', minute: '2-digit' });
 }
 
+// Hours a task is late (or null). Mirrors the backend rule.
+function taskHoursLate(t) {
+  if (!t || t.status === 'verified') return null;
+  const dl = new Date(t.deadline);
+  if (isNaN(dl)) return null;
+  if (t.submitted_at) {
+    const sub = new Date(t.submitted_at);
+    return sub > dl ? Math.ceil((sub - dl) / 3600000) : null;
+  }
+  const now = new Date();
+  return now > dl ? Math.ceil((now - dl) / 3600000) : null;
+}
+
+function fmtLate(hours) {
+  if (hours == null) return '';
+  if (hours < 24) return hours + 'h late';
+  const d = Math.floor(hours / 24), h = hours % 24;
+  return d + 'd ' + (h ? h + 'h ' : '') + 'late';
+}
+
 function strikeClass(n) {
   if (n >= 3) return 'strike3';
   if (n === 2) return 'strike2';

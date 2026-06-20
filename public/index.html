@@ -9,7 +9,7 @@
 <body>
 <div class="center-wrap">
   <div class="auth-box">
-    <div class="auth-title">Monta<span>Ranker</span></div>
+    <div class="auth-title"><span class="bull">🐂</span>Monta<span>Ranker</span></div>
     <div class="auth-sub">FRC Team 115 · Member &amp; Officer Portal</div>
 
     <div class="card">
@@ -23,10 +23,11 @@
 
       <!-- LOGIN -->
       <div id="view-login">
-        <label>Student ID</label>
-        <input id="login-id" inputmode="numeric" placeholder="e.g. 1234567">
+        <label>Full Name</label>
+        <input id="login-name" placeholder="First Last">
         <label>Password</label>
-        <input id="login-pw" type="password" placeholder="Your password">
+        <input id="login-pw" type="password" placeholder="Your password"
+               onkeydown="if(event.key==='Enter')doLogin()">
         <div class="btnrow">
           <button onclick="doLogin()">Log In</button>
         </div>
@@ -109,9 +110,9 @@ async function loadPositions() {
 loadPositions();
 
 async function doLogin() {
-  const student_id = document.getElementById('login-id').value.trim();
+  const full_name = document.getElementById('login-name').value.trim();
   const password = document.getElementById('login-pw').value;
-  const { ok, data } = await api('/api/login', { student_id, password });
+  const { ok, data } = await api('/api/login', { full_name, password });
   if (!ok) return msg(data.error || 'Login failed.');
   location.href = '/dashboard.html';
 }
