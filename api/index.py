@@ -1,15 +1,8 @@
-"""
-MontaRanker - Vercel serverless backend (single catch-all function).
-
-All /api/* routes are rewritten to this function by vercel.json.
-
-Differences from the local server.py:
-  - Postgres (Neon) instead of SQLite          -> env var DATABASE_URL
-  - Vercel Blob for photos/evidence            -> env var BLOB_READ_WRITE_TOKEN
-  - Stateless signed-cookie auth (no memory)   -> env var SECRET_KEY
-
-Static files (public/) are served by Vercel directly.
-"""
+# MontaRanker backend for Vercel - one function handles every /api/* call
+# (vercel.json sends them all here). Uses Neon Postgres for data, Vercel Blob
+# for the photo/evidence files, and a signed cookie for login since serverless
+# functions don't keep anything in memory between requests.
+# Needs these env vars: DATABASE_URL, BLOB_READ_WRITE_TOKEN, SECRET_KEY.
 
 import os
 import json
@@ -28,17 +21,17 @@ from urllib.parse import urlparse, parse_qs
 try:
     import psycopg2
     import psycopg2.extras
-except Exception:  # installed on Vercel via requirements.txt
-    psycopg2 = None
+except Exception:
+    psycopg2 = None  # present on Vercel, may be missing when testing locally
 
 try:
     import vercel_blob
-except Exception:  # package only needed at runtime on Vercel
+except Exception:
     vercel_blob = None
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "RaymondIsTheGoat!")
 SECRET = os.environ.get("SECRET_KEY", "please-set-a-SECRET_KEY-env-var").encode()
-TOKEN_TTL = 60 * 60 * 24 * 30  # 30 days
+TOKEN_TTL = 60 * 60 * 24 * 30  # stay logged in for a month
 
 OFFICER_POSITIONS = [
     "President",
@@ -56,10 +49,6 @@ OFFICER_POSITIONS = [
 _initialized = False
 
 
-# ---------------------------------------------------------------------------
-# Database
-# ---------------------------------------------------------------------------
-
 def get_conn():
     dsn = os.environ.get("DATABASE_URL")
     if not dsn:
@@ -73,6 +62,7 @@ def cursor(conn):
 
 
 def ensure_init():
+    # creates the tables on the first request after a cold start
     global _initialized
     if _initialized:
         return
@@ -129,10 +119,6 @@ def ensure_init():
     _initialized = True
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 def now_iso():
     return datetime.now().isoformat(timespec="seconds")
 
@@ -154,6 +140,7 @@ def hash_password(password, salt=None):
 
 
 def make_token(payload):
+    # base64 payload + an hmac signature so it can't be tampered with
     payload = dict(payload)
     payload["exp"] = int(time.time()) + TOKEN_TTL
     body = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().rstrip("=")
@@ -209,6 +196,7 @@ def compute_scores(cur, user_id):
     for row in cur.fetchall():
         difficulty = row["difficulty"]
         verified_difficulty += difficulty
+        # sent back twice -> no difficulty points
         base = 0 if row["return_count"] >= 2 else difficulty
         deadline = parse_dt(row["deadline"])
         submitted = parse_dt(row["submitted_at"])
@@ -235,7 +223,7 @@ def compute_scores(cur, user_id):
 
 
 def task_hours_late(row, now):
-    """Hours a task is late, or None if it isn't late."""
+    # hours late, or None if not late (submitted tasks judged at submit time)
     if row["status"] == "verified":
         return None
     deadline = parse_dt(row["deadline"])
@@ -263,16 +251,11 @@ def user_public(row):
     }
 
 
-# ---------------------------------------------------------------------------
-# Request handler
-# ---------------------------------------------------------------------------
-
 class handler(BaseHTTPRequestHandler):
 
     def log_message(self, fmt, *args):
         pass
 
-    # -- low level ----------------------------------------------------------
     def _cookie_token(self):
         c = cookies.SimpleCookie(self.headers.get("Cookie", ""))
         if "sid" in c:
@@ -321,11 +304,9 @@ class handler(BaseHTTPRequestHandler):
     def _cookie(self, token):
         return f"sid={token}; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age={TOKEN_TTL}"
 
-    # -- routing ------------------------------------------------------------
     def _api_path(self):
-        # vercel.json rewrites /api/<x> to /api/index?route=<x>, so the real
-        # route is carried in the query string (robust regardless of whether
-        # Vercel preserves the original path). Fall back to the raw path locally.
+        # vercel.json rewrites /api/<x> to /api/index?route=<x>, so grab the
+        # route from the query string. locally there's no rewrite, use the path.
         parsed = urlparse(self.path)
         route = parse_qs(parsed.query).get("route", [None])[0]
         if route is not None:
@@ -397,7 +378,6 @@ class handler(BaseHTTPRequestHandler):
             return fn()
         return self._error("Not found", 404)
 
-    # -- auth ---------------------------------------------------------------
     def _signup(self):
         d = self._read_json()
         full_name = (d.get("full_name") or "").strip()
@@ -466,7 +446,6 @@ class handler(BaseHTTPRequestHandler):
         self._send_json({"ok": True},
                         set_cookie="sid=; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=0")
 
-    # -- me -----------------------------------------------------------------
     def _me(self):
         s = self._session()
         if not s:
@@ -484,7 +463,6 @@ class handler(BaseHTTPRequestHandler):
         u["is_officer"] = bool(row["officer_position"])
         self._send_json({"user": u})
 
-    # -- attendance ---------------------------------------------------------
     def _att_status(self):
         s = self._require_user()
         if not s:
@@ -549,7 +527,6 @@ class handler(BaseHTTPRequestHandler):
         conn.commit(); cur.close(); conn.close()
         self._send_json({"ok": True, "hours": round(hours, 2), "points": round(0.1 * hours, 3)})
 
-    # -- tasks --------------------------------------------------------------
     def _tasks_mine(self):
         s = self._require_user()
         if not s:
@@ -666,7 +643,6 @@ class handler(BaseHTTPRequestHandler):
         conn.commit(); cur.close(); conn.close()
         self._send_json({"ok": True})
 
-    # -- scoreboard ---------------------------------------------------------
     def _scoreboard(self):
         if not self._session():
             return self._error("Not logged in", 401)
@@ -688,7 +664,6 @@ class handler(BaseHTTPRequestHandler):
             r["position"] = i + 1
         self._send_json({"scoreboard": rows})
 
-    # -- admin --------------------------------------------------------------
     def _admin_users(self):
         if not self._require_admin():
             return

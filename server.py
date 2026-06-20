@@ -1,17 +1,7 @@
 #!/usr/bin/env python3
-"""
-MontaRanker - FRC Team 115 ranking / organization web app.
-
-Pure Python standard library. No pip installs required.
-Run:  py server.py   (then open http://localhost:8000)
-
-Stack:
-  - http.server (ThreadingHTTPServer) for the web server + REST API
-  - sqlite3 (stdlib) for storage
-  - hashlib.pbkdf2 for password hashing
-  - in-memory session tokens via a cookie
-  - browser getUserMedia for camera-only attendance photos
-"""
+# MontaRanker - local dev server (Team 115).
+# Just runs on the stdlib, no installs. Start it with `py server.py` and open
+# http://localhost:8000. Data goes in data/montaranker.db, photos in uploads/.
 
 import http.server
 import socketserver
@@ -52,9 +42,6 @@ os.makedirs(os.path.join(UPLOADS, "attendance"), exist_ok=True)
 os.makedirs(os.path.join(UPLOADS, "evidence"), exist_ok=True)
 os.makedirs(os.path.join(HERE, "data"), exist_ok=True)
 
-# ---------------------------------------------------------------------------
-# Database
-# ---------------------------------------------------------------------------
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -119,10 +106,6 @@ def init_db():
     conn.close()
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 def now_iso():
     return datetime.now().isoformat(timespec="seconds")
 
@@ -143,12 +126,11 @@ def hash_password(password, salt=None):
     return h, salt
 
 
-# session token -> {"type": "user"|"admin", "id": int|None}
+# logged-in tokens live here while the server is up (cleared on restart)
 SESSIONS = {}
 
 
 def compute_scores(conn, user_id):
-    """Return dict with attendance/task/late breakdown for one user."""
     attendance_score = 0.0
     total_hours = 0.0
     for row in conn.execute(
@@ -161,7 +143,7 @@ def compute_scores(conn, user_id):
 
     task_score = 0.0
     late_penalty = 0.0
-    verified_difficulty = 0  # sum of difficulty of verified tasks (for "hardest worker")
+    verified_difficulty = 0
     for row in conn.execute(
         "SELECT difficulty, deadline, submitted_at, return_count "
         "FROM tasks WHERE assigned_to=? AND status='verified'",
@@ -169,6 +151,7 @@ def compute_scores(conn, user_id):
     ):
         difficulty = row["difficulty"]
         verified_difficulty += difficulty
+        # sent back twice -> no difficulty points
         base = 0 if row["return_count"] >= 2 else difficulty
         deadline = parse_dt(row["deadline"])
         submitted = parse_dt(row["submitted_at"])
@@ -196,12 +179,9 @@ def compute_scores(conn, user_id):
 
 
 def task_hours_late(row, now):
-    """Hours a task is late, or None if it isn't late.
-
-    - verified tasks are never 'late' here
-    - submitted tasks: measured at submission time vs deadline
-    - not-yet-submitted tasks: measured against 'now' (and still growing)
-    """
+    # returns how many hours late a task is, or None if it isn't late.
+    # already-submitted tasks are judged at submit time; ones still out are
+    # judged against now (so the number keeps climbing until they turn it in).
     if row["status"] == "verified":
         return None
     deadline = parse_dt(row["deadline"])
@@ -229,16 +209,11 @@ def user_public(row):
     }
 
 
-# ---------------------------------------------------------------------------
-# Request handler
-# ---------------------------------------------------------------------------
-
 class Handler(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
-    # -- low level helpers --------------------------------------------------
     def log_message(self, fmt, *args):
-        pass  # quiet
+        pass
 
     def _session(self):
         c = cookies.SimpleCookie(self.headers.get("Cookie", ""))
@@ -282,7 +257,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return None
         return s
 
-    # -- routing ------------------------------------------------------------
     def do_GET(self):
         path = urlparse(self.path).path
         if path.startswith("/api/"):
@@ -292,8 +266,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         return self.serve_static(path)
 
     def do_POST(self):
-        # Always fully read the request body so a handler that ignores it can't
-        # corrupt the next keep-alive request on the same connection.
+        # read the body up front - if a handler skips it the leftover bytes
+        # break the next request on a kept-alive connection
         length = int(self.headers.get("Content-Length", 0) or 0)
         self._body_raw = self.rfile.read(length) if length else b""
         path = urlparse(self.path).path
@@ -301,7 +275,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self.handle_api_post(path)
         self._error("Not found", 404)
 
-    # -- static -------------------------------------------------------------
     def serve_static(self, path):
         if path == "/" or path == "":
             path = "/index.html"
@@ -319,7 +292,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def serve_upload(self, path):
-        # require any logged in session to view uploaded media
         if not self._session():
             self._error("Not authorized", 401)
             return
@@ -337,7 +309,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
-    # -- API GET ------------------------------------------------------------
     def handle_api_get(self, path):
         if path == "/api/officer-positions":
             return self._send_json({"positions": OFFICER_POSITIONS})
@@ -407,7 +378,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._send_json({"tasks": rows})
 
         if path == "/api/members":
-            # list of members (for officers assigning tasks)
             s = self._require_user()
             if not s:
                 return
@@ -423,7 +393,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._error("Not logged in", 401)
             return self._scoreboard()
 
-        # ---- admin ----
         if path == "/api/admin/users":
             if not self._require_admin():
                 return
@@ -471,7 +440,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         return self._error("Not found", 404)
 
-    # -- API POST -----------------------------------------------------------
     def handle_api_post(self, path):
         if path == "/api/signup":
             return self._signup()
@@ -511,7 +479,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         return self._error("Not found", 404)
 
-    # -- auth ---------------------------------------------------------------
     def _signup(self):
         d = self._read_json()
         full_name = (d.get("full_name") or "").strip()
@@ -590,7 +557,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
             SESSIONS.pop(c["sid"].value, None)
         self._send_json({"ok": True}, set_cookie="sid=; Path=/; Max-Age=0")
 
-    # -- attendance ---------------------------------------------------------
     def _checkin(self):
         s = self._require_user()
         if not s:
@@ -629,7 +595,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
             conn.close()
             return self._error("You are not checked in.")
 
-        # save photo
         try:
             header, b64 = photo.split(",", 1)
             raw = base64.b64decode(b64)
@@ -653,7 +618,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self._send_json({"ok": True, "hours": round(hours, 2),
                          "points": round(0.1 * hours, 3)})
 
-    # -- tasks --------------------------------------------------------------
     def _create_task(self):
         s = self._require_user()
         if not s:
@@ -708,7 +672,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             task_id = int(d.get("task_id"))
         except (TypeError, ValueError):
             return self._error("Bad task id.")
-        evidence = d.get("evidence") or ""   # data URL
+        evidence = d.get("evidence") or ""
         ev_name = (d.get("evidence_name") or "evidence").strip()
         if not evidence.startswith("data:"):
             return self._error("Evidence (image, video, pdf or file) is required.")
@@ -745,7 +709,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
         conn.close()
         self._send_json({"ok": True})
 
-    # -- scoreboard ---------------------------------------------------------
     def _scoreboard(self):
         conn = get_db()
         rows = []
@@ -767,7 +730,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
             r["position"] = i + 1
         self._send_json({"scoreboard": rows})
 
-    # -- admin --------------------------------------------------------------
     def _admin_user_detail(self, uid):
         conn = get_db()
         row = conn.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
@@ -785,7 +747,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         strikes = [dict(r) for r in conn.execute(
             "SELECT * FROM strike_log WHERE user_id=? ORDER BY id DESC", (uid,)
         )]
-        # activity = merged recent events
+        # build a little recent-activity feed from attendance + tasks
         activity = []
         for a in attendance[:15]:
             if a["check_out"]:
@@ -997,6 +959,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if not row:
             conn.close()
             return self._error("User not found", 404)
+        # clear their child rows first or the foreign keys complain
         conn.execute("DELETE FROM attendance WHERE user_id=?", (uid,))
         conn.execute("DELETE FROM tasks WHERE assigned_to=?", (uid,))
         conn.execute("DELETE FROM strike_log WHERE user_id=?", (uid,))
@@ -1026,12 +989,9 @@ class ThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
 def main():
     init_db()
     httpd = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
-    print("=" * 60)
-    print("  MontaRanker is running!")
-    print(f"  Open:  http://localhost:{PORT}")
-    print(f"  Admin password: {ADMIN_PASSWORD}")
-    print("  Press Ctrl+C to stop.")
-    print("=" * 60)
+    print(f"MontaRanker running on http://localhost:{PORT}")
+    print(f"Admin password: {ADMIN_PASSWORD}")
+    print("Ctrl+C to stop.")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
