@@ -139,7 +139,7 @@ document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
   if (t.dataset.view === 'attendance') loadAttendance();
 });
 
-// ---- init ----
+// figure out who's logged in
 (async () => {
   const { data } = await api('/api/me');
   if (!data.user) { location.href = '/'; return; }
@@ -151,7 +151,7 @@ document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
   loadAttendance();
 })();
 
-// ---- attendance ----
+// attendance tab
 async function loadAttendance() {
   const { data } = await api('/api/attendance/status');
   const el = document.getElementById('att-status');
@@ -213,7 +213,7 @@ async function snapAndCheckout() {
   loadAttendance();
 }
 
-// ---- my tasks ----
+// my tasks tab
 async function loadMyTasks() {
   const { data } = await api('/api/tasks/mine');
   const tasks = data.tasks || [];
@@ -274,7 +274,7 @@ document.getElementById('evidence-input').addEventListener('change', async (e) =
   loadMyTasks();
 });
 
-// ---- assign ----
+// assign tasks (officers only)
 async function loadAssign() {
   const m = await api('/api/members');
   const sel = document.getElementById('t-assignee');
@@ -306,7 +306,7 @@ async function createTask() {
   loadAssign();
 }
 
-// ---- scoreboard ----
+// scoreboard tab
 async function loadScoreboard() {
   const { data } = await api('/api/scoreboard');
   const tb = document.querySelector('#scoreboard tbody');

@@ -1,18 +1,14 @@
-# Local dev data (do NOT deploy these to Vercel)
+# local data
 data/
 uploads/
 *.log
 *.err
 
-# Python
 __pycache__/
 *.pyc
 .venv/
 venv/
-
-# Vercel
 .vercel/
 
-# Secrets
 .env
 .env.local

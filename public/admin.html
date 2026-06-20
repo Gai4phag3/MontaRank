@@ -128,7 +128,7 @@ document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
   loadHome();
 })();
 
-// ---- home ----
+// home tab
 async function loadHome() {
   const { data } = await api('/api/admin/home');
   if (!data.stats) return;
@@ -149,7 +149,7 @@ async function loadHome() {
     ).join('') || '<tr><td class="muted">No data.</td></tr>';
 }
 
-// ---- verifications ----
+// verifications tab
 async function loadVerify() {
   const { data } = await api('/api/admin/pending');
   const tb = document.querySelector('#pending tbody');
@@ -189,7 +189,7 @@ async function verifyAll() {
   loadVerify();
 }
 
-// ---- late tasks ----
+// late tasks tab
 async function loadLate() {
   const { data } = await api('/api/admin/late-tasks');
   const tasks = data.tasks || [];
@@ -211,7 +211,7 @@ async function loadLate() {
     </tr>`).join('') || '<tr><td colspan="7" class="muted">No late tasks.</td></tr>';
 }
 
-// ---- users ----
+// members tab
 async function loadUsers() {
   const { data } = await api('/api/admin/users');
   const tb = document.querySelector('#users tbody');
@@ -327,7 +327,7 @@ async function clearAll() {
   loadUsers(); loadHome();
 }
 
-// ---- scoreboard ----
+// scoreboard tab
 async function loadScoreboard() {
   const { data } = await api('/api/scoreboard');
   const tb = document.querySelector('#scoreboard tbody');

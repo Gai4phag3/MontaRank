@@ -1,4 +1,4 @@
-// Shared helpers for MontaRanker pages.
+// stuff shared by all the pages
 
 async function api(path, body, method) {
   const r = await fetch(path, {
@@ -18,7 +18,7 @@ function fmtDate(iso) {
     hour: '2-digit', minute: '2-digit' });
 }
 
-// Hours a task is late (or null). Mirrors the backend rule.
+// how many hours late a task is, null if it's fine (same idea as the backend)
 function taskHoursLate(t) {
   if (!t || t.status === 'verified') return null;
   const dl = new Date(t.deadline);
@@ -50,7 +50,7 @@ function esc(s) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-// Modal -------------------------------------------------------------------
+// modal popups
 function showModal(html) {
   closeModal();
   const bg = document.createElement('div');
@@ -65,8 +65,7 @@ function closeModal() {
   if (m) m.remove();
 }
 
-// Local server stores a relative path ("attendance/x.png" -> /uploads/...);
-// Vercel stores a full https Blob URL. Normalise either to a usable URL.
+// local server gives a relative path, the hosted one gives a full blob url
 function mediaURL(v) {
   if (!v) return '';
   return /^https?:\/\//.test(v) ? v : '/uploads/' + v;
@@ -89,7 +88,6 @@ async function logout() {
   location.href = '/';
 }
 
-// read a File as data URL
 function fileToDataURL(file) {
   return new Promise((resolve, reject) => {
     const r = new FileReader();

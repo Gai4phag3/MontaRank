@@ -57,7 +57,7 @@ body::before {
 a { color: var(--gold); text-decoration: none; }
 a:hover { color: var(--gold-bright); }
 
-/* ---- top bar ---- */
+/* top bar */
 .topbar {
   display: flex;
   align-items: center;
@@ -97,7 +97,7 @@ a:hover { color: var(--gold-bright); }
 
 .container { max-width: 1100px; margin: 0 auto; padding: 24px 20px 60px; }
 
-/* ---- tabs ---- */
+/* tabs */
 .tabs {
   display: flex;
   gap: 4px;
@@ -128,7 +128,7 @@ a:hover { color: var(--gold-bright); }
 }
 @keyframes growIn { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 
-/* ---- cards ---- */
+/* cards */
 .card {
   background: linear-gradient(180deg, var(--panel), var(--panel2));
   border: 1px solid var(--border);
@@ -145,7 +145,7 @@ a:hover { color: var(--gold-bright); }
 
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 
-/* ---- forms ---- */
+/* forms */
 label { display: block; margin: 14px 0 5px; font-size: 13px; color: var(--muted); font-weight: 600; }
 
 input, select, textarea {
@@ -168,7 +168,7 @@ input:focus, select:focus, textarea:focus {
 }
 select option { background: var(--panel2); }
 
-/* ---- buttons ---- */
+/* buttons */
 button {
   background: linear-gradient(135deg, var(--gold-bright), var(--gold-dim));
   color: #2a1547;
@@ -202,14 +202,14 @@ button.small { padding: 7px 12px; font-size: 12px; border-radius: 8px; }
 .row > * { flex: 1; min-width: 160px; }
 .btnrow { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
 
-/* ---- tables ---- */
+/* tables */
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: 11px 13px; border-bottom: 1px solid var(--border-soft); }
 th { color: var(--gold-dim); font-size: 11px; text-transform: uppercase; letter-spacing: .7px; }
 tbody tr { transition: background .18s ease; }
 tbody tr:hover td { background: rgba(139, 92, 246, .12); }
 
-/* ---- badges ---- */
+/* badges */
 .badge {
   display: inline-block;
   padding: 3px 10px;
@@ -250,7 +250,7 @@ tr.late-row:hover td { background: rgba(239,75,87,.18); }
 .muted { color: var(--muted); }
 .pill { padding: 3px 9px; border-radius: 7px; background: var(--panel3); font-size: 12px; }
 
-/* ---- messages ---- */
+/* messages */
 .msg {
   padding: 11px 15px;
   border-radius: 10px;
@@ -261,12 +261,12 @@ tr.late-row:hover td { background: rgba(239,75,87,.18); }
 .msg.error { background: rgba(239,75,87,.14); border: 1px solid rgba(239,75,87,.4); color: #ff9aa3; }
 .msg.ok    { background: rgba(54,196,106,.14); border: 1px solid rgba(54,196,106,.4); color: #88f0ad; }
 
-/* ---- strikes ---- */
+/* strike colors */
 .strike1 { color: var(--yellow) !important; font-weight: 800; }
 .strike2 { color: var(--orange) !important; font-weight: 800; }
 .strike3 { color: var(--red) !important; font-weight: 800; text-shadow: 0 0 12px rgba(239,75,87,.5); }
 
-/* ---- big score ---- */
+/* big score number */
 .score-big {
   font-size: 34px;
   font-weight: 900;
@@ -279,7 +279,7 @@ tr.late-row:hover td { background: rgba(239,75,87,.18); }
 }
 @keyframes shimmer { to { background-position: 200% center; } }
 
-/* ---- stat grid ---- */
+/* stat grid */
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
 .stat {
   background: linear-gradient(160deg, var(--panel2), var(--panel3));
@@ -293,7 +293,7 @@ tr.late-row:hover td { background: rgba(239,75,87,.18); }
 .stat .n { font-size: 30px; font-weight: 900; color: var(--gold); }
 .stat .l { color: var(--muted); font-size: 13px; }
 
-/* ---- camera ---- */
+/* camera */
 video, canvas {
   width: 100%;
   max-width: 420px;
@@ -303,7 +303,7 @@ video, canvas {
   box-shadow: 0 0 0 1px var(--gold-glow), 0 18px 40px -20px rgba(0,0,0,.8);
 }
 
-/* ---- auth page ---- */
+/* login page */
 .center-wrap {
   min-height: 100vh;
   display: flex;
@@ -332,7 +332,7 @@ video, canvas {
 [id^="view-"] { animation: fadeIn .35s ease; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-/* ---- media thumbs ---- */
+/* photo thumbnails */
 .evidence-link { color: var(--gold); cursor: pointer; font-weight: 600; }
 .evidence-link:hover { color: var(--gold-bright); text-decoration: underline; }
 .thumb {
@@ -345,7 +345,7 @@ video, canvas {
 }
 .thumb:hover { transform: scale(1.08); border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-glow); }
 
-/* ---- modal ---- */
+/* modal popup */
 .modal-bg {
   position: fixed; inset: 0;
   background: rgba(8, 3, 16, .72);
